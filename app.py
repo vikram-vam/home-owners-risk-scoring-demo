@@ -655,7 +655,6 @@ st.markdown(f"""
   <div style='color:#CBD5E1;font-size:.70rem;margin-top:10px;letter-spacing:.3px'>
     Poisson GLM (&#955;) &nbsp;·&nbsp; Gamma GLM (&#956;) &nbsp;·&nbsp;
     RF + HistGBM + ExtraTrees M&#x0302; Ensemble (trained on GLM residuals) &nbsp;·&nbsp;
-    TweedieRegressor(p=1.65) — rate-filing display &nbsp;·&nbsp;
     100K Synthetic Policies &nbsp;·&nbsp; 3-Tier Feature Architecture
   </div>
 </div>
@@ -2348,393 +2347,393 @@ with TABS[3]:
       </span>
     </div>""", unsafe_allow_html=True)
 
-    # ── KPI banner ─────────────────────────────────────────────────────────────
-    k1, k2, k3, k4, k5 = st.columns(5)
-    total_pol   = len(data)
-    total_prem  = data["indicated_premium"].sum()
-    total_el    = data["expected_loss_true"].sum()
-    avg_m       = data["M_true"].mean()
-    pct_t3_act  = (data["M_true"] > 1.01).mean() * 100
-    with k1: st.markdown(mc("Total Policies",   f"{total_pol:,}",    "#6ba8d4"), unsafe_allow_html=True)
-    with k2: st.markdown(mc("Total Premium",    f"${total_prem/1e6:.1f}M", "#059669"), unsafe_allow_html=True)
-    with k3: st.markdown(mc("Total Exp. Loss",  f"${total_el/1e6:.1f}M",  "#CA8A04"), unsafe_allow_html=True)
-    with k4: st.markdown(mc("Avg M̂",           f"×{avg_m:.3f}",      TIER_COLORS["tier3"]), unsafe_allow_html=True)
-    with k5: st.markdown(mc("Policies w/ Active T3", f"{pct_t3_act:.0f}%", "#B45309",
-                             sub="M̂ > 1.0"), unsafe_allow_html=True)
+        # ── KPI banner ─────────────────────────────────────────────────────────────
+        k1, k2, k3, k4, k5 = st.columns(5)
+        total_pol   = len(data)
+        total_prem  = data["indicated_premium"].sum()
+        total_el    = data["expected_loss_true"].sum()
+        avg_m       = data["M_true"].mean()
+        pct_t3_act  = (data["M_true"] > 1.01).mean() * 100
+        with k1: st.markdown(mc("Total Policies",   f"{total_pol:,}",    "#6ba8d4"), unsafe_allow_html=True)
+        with k2: st.markdown(mc("Total Premium",    f"${total_prem/1e6:.1f}M", "#059669"), unsafe_allow_html=True)
+        with k3: st.markdown(mc("Total Exp. Loss",  f"${total_el/1e6:.1f}M",  "#CA8A04"), unsafe_allow_html=True)
+        with k4: st.markdown(mc("Avg M̂",           f"×{avg_m:.3f}",      TIER_COLORS["tier3"]), unsafe_allow_html=True)
+        with k5: st.markdown(mc("Policies w/ Active T3", f"{pct_t3_act:.0f}%", "#B45309",
+                                 sub="M̂ > 1.0"), unsafe_allow_html=True)
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # ── Row 1: Risk band distribution + M̂ by state ────────────────────────────
-    r1c1, r1c2 = st.columns(2)
+        # ── Row 1: Risk band distribution + M̂ by state ────────────────────────────
+        r1c1, r1c2 = st.columns(2)
 
-    with r1c1:
-        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                    f"color:{TIER_COLORS['tier1']};margin-bottom:6px'>"
-                    "Risk Score Distribution (Portfolio A1)</div>", unsafe_allow_html=True)
-        def _band_label(s):
-            if s < 200: return "Very Low"
-            if s < 400: return "Low"
-            if s < 600: return "Moderate"
-            if s < 800: return "High"
-            return "Very High"
-        data["risk_band_calc"] = data["risk_score_true"].apply(_band_label)
-        band_counts = data["risk_band_calc"].value_counts().reindex(
-            ["Very Low","Low","Moderate","High","Very High"]).fillna(0)
-        band_prem   = data.groupby("risk_band_calc")["indicated_premium"].sum().reindex(
-            ["Very Low","Low","Moderate","High","Very High"]).fillna(0)
+        with r1c1:
+            st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                        f"color:{TIER_COLORS['tier1']};margin-bottom:6px'>"
+                        "Risk Score Distribution (Portfolio A1)</div>", unsafe_allow_html=True)
+            def _band_label(s):
+                if s < 200: return "Very Low"
+                if s < 400: return "Low"
+                if s < 600: return "Moderate"
+                if s < 800: return "High"
+                return "Very High"
+            data["risk_band_calc"] = data["risk_score_true"].apply(_band_label)
+            band_counts = data["risk_band_calc"].value_counts().reindex(
+                ["Very Low","Low","Moderate","High","Very High"]).fillna(0)
+            band_prem   = data.groupby("risk_band_calc")["indicated_premium"].sum().reindex(
+                ["Very Low","Low","Moderate","High","Very High"]).fillna(0)
 
-        fig_bands = go.Figure()
-        bcolors   = [BAND_COLORS[b] for b in band_counts.index]
-        fig_bands.add_trace(go.Bar(
-            x=band_counts.index,
-            y=band_counts.values,
-            marker_color=bcolors,
-            name="Policy Count",
-            text=[f"{v:,.0f}<br>({v/total_pol*100:.0f}%)" for v in band_counts.values],
-            textposition="outside",
-            yaxis="y",
-        ))
-        fig_bands.add_trace(go.Scatter(
-            x=band_counts.index,
-            y=band_prem.values / 1e6,
-            mode="lines+markers",
-            name="Premium ($M)",
-            marker=dict(color="#CA8A04", size=9),
-            line=dict(color="#CA8A04", width=2),
-            yaxis="y2",
-        ))
-        fig_bands.update_layout(
-            height=290, **_layout,
-            yaxis=dict(title="Policy Count", gridcolor=GRID_COL),
-            yaxis2=dict(title="Premium ($M)", overlaying="y", side="right",
-                        gridcolor="rgba(0,0,0,0)"),
-            legend=dict(orientation="h", y=1.08),
-            xaxis=dict(showgrid=False),
-        )
-        st.plotly_chart(fig_bands, use_container_width=True)
+            fig_bands = go.Figure()
+            bcolors   = [BAND_COLORS[b] for b in band_counts.index]
+            fig_bands.add_trace(go.Bar(
+                x=band_counts.index,
+                y=band_counts.values,
+                marker_color=bcolors,
+                name="Policy Count",
+                text=[f"{v:,.0f}<br>({v/total_pol*100:.0f}%)" for v in band_counts.values],
+                textposition="outside",
+                yaxis="y",
+            ))
+            fig_bands.add_trace(go.Scatter(
+                x=band_counts.index,
+                y=band_prem.values / 1e6,
+                mode="lines+markers",
+                name="Premium ($M)",
+                marker=dict(color="#CA8A04", size=9),
+                line=dict(color="#CA8A04", width=2),
+                yaxis="y2",
+            ))
+            fig_bands.update_layout(
+                height=290, **_layout,
+                yaxis=dict(title="Policy Count", gridcolor=GRID_COL),
+                yaxis2=dict(title="Premium ($M)", overlaying="y", side="right",
+                            gridcolor="rgba(0,0,0,0)"),
+                legend=dict(orientation="h", y=1.08),
+                xaxis=dict(showgrid=False),
+            )
+            st.plotly_chart(fig_bands, use_container_width=True)
 
-    with r1c2:
-        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                    f"color:{TIER_COLORS['tier3']};margin-bottom:6px'>"
-                    "⚡ Interaction Risk by State — Where Compound Risk Concentrates</div>",
-                    unsafe_allow_html=True)
-
-        # ── Aggregate state-level metrics for choropleth ──
-        m_by_state = (data.groupby("state")
-                          .agg(mean_m=("M_true","mean"),
-                               policies=("policy_id","count"),
-                               total_prem=("indicated_premium","sum"),
-                               total_el=("expected_loss_true","sum"))
-                          .reset_index())
-        # Identify top peril driver per state (highest % of High-zone policies)
-        _peril_map = {"wildfire_zone": "Wildfire", "flood_zone": "Flood",
-                      "earthquake_zone": "Earthquake", "hail_zone": "Hail"}
-        _top_perils = []
-        for st_code in m_by_state["state"]:
-            st_slice = data[data["state"] == st_code]
-            pcts = {lbl: (st_slice[col] == "High").mean()
-                    for col, lbl in _peril_map.items()}
-            _top_perils.append(max(pcts, key=pcts.get))
-        m_by_state["top_peril"] = _top_perils
-
-        m_by_state["hover"] = m_by_state.apply(
-            lambda r: (f"<b>{r.state}</b><br>"
-                       f"Mean M̂: ×{r.mean_m:.2f}<br>"
-                       f"Policies: {r.policies:,}<br>"
-                       f"Premium: ${r.total_prem/1e6:.1f}M<br>"
-                       f"Exp Loss: ${r.total_el/1e6:.1f}M<br>"
-                       f"Top Peril: {r.top_peril}"), axis=1)
-
-        fig_choro = go.Figure(go.Choropleth(
-            locations=m_by_state["state"],
-            z=m_by_state["mean_m"],
-            locationmode="USA-states",
-            colorscale=[[0,"#FEF3C7"],[0.35,"#F59E0B"],
-                        [0.65,"#D97706"],[1.0,"#92400E"]],
-            zmin=m_by_state["mean_m"].min() - 0.05,
-            zmax=m_by_state["mean_m"].max() + 0.05,
-            marker_line_color="#FFFFFF",
-            marker_line_width=1.5,
-            colorbar=dict(title=dict(text="Mean M̂", font=dict(size=11)),
-                          thickness=12, len=0.6, tickfont=dict(size=9)),
-            text=m_by_state["hover"],
-            hovertemplate="%{text}<extra></extra>",
-        ))
-        fig_choro.update_layout(
-            height=290,
-            **{k: v for k, v in _layout.items() if k != "margin"},
-            geo=dict(
-                scope="usa",
-                bgcolor="#FAFBFD",
-                lakecolor="#FAFBFD",
-                landcolor="#F1F5F9",
-                showlakes=False,
-                projection_type="albers usa",
-            ),
-            margin=dict(l=0, r=0, t=10, b=0),
-        )
-        st.plotly_chart(fig_choro, use_container_width=True)
-        ca_m = m_by_state.loc[m_by_state["state"]=="CA","mean_m"].values
-        top_st = m_by_state.sort_values("mean_m", ascending=False).iloc[0]
-        if len(ca_m):
-            st.markdown(f"<div style='font-size:.76rem;color:#6B7280;'>"
-                        f"CA dominates at ×{ca_m[0]:.2f} (Wood Shake × High Wildfire). "
-                        f"FL elevated by flood × coastal surge. "
-                        f"Gray states outside 10-state model universe.</div>",
+        with r1c2:
+            st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                        f"color:{TIER_COLORS['tier3']};margin-bottom:6px'>"
+                        "⚡ Interaction Risk by State — Where Compound Risk Concentrates</div>",
                         unsafe_allow_html=True)
 
-    st.markdown("---")
+            # ── Aggregate state-level metrics for choropleth ──
+            m_by_state = (data.groupby("state")
+                              .agg(mean_m=("M_true","mean"),
+                                   policies=("policy_id","count"),
+                                   total_prem=("indicated_premium","sum"),
+                                   total_el=("expected_loss_true","sum"))
+                              .reset_index())
+            # Identify top peril driver per state (highest % of High-zone policies)
+            _peril_map = {"wildfire_zone": "Wildfire", "flood_zone": "Flood",
+                          "earthquake_zone": "Earthquake", "hail_zone": "Hail"}
+            _top_perils = []
+            for st_code in m_by_state["state"]:
+                st_slice = data[data["state"] == st_code]
+                pcts = {lbl: (st_slice[col] == "High").mean()
+                        for col, lbl in _peril_map.items()}
+                _top_perils.append(max(pcts, key=pcts.get))
+            m_by_state["top_peril"] = _top_perils
 
-    # ── Row 1b: State × Peril Interaction Heatmap ────────────────────────────
-    st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                f"color:{TIER_COLORS['tier3']};margin-bottom:2px'>"
-                "🔥 State × Peril Interaction Heatmap — Where Compound Risk Clusters</div>",
+            m_by_state["hover"] = m_by_state.apply(
+                lambda r: (f"<b>{r.state}</b><br>"
+                           f"Mean M̂: ×{r.mean_m:.2f}<br>"
+                           f"Policies: {r.policies:,}<br>"
+                           f"Premium: ${r.total_prem/1e6:.1f}M<br>"
+                           f"Exp Loss: ${r.total_el/1e6:.1f}M<br>"
+                           f"Top Peril: {r.top_peril}"), axis=1)
+
+            fig_choro = go.Figure(go.Choropleth(
+                locations=m_by_state["state"],
+                z=m_by_state["mean_m"],
+                locationmode="USA-states",
+                colorscale=[[0,"#FEF3C7"],[0.35,"#F59E0B"],
+                            [0.65,"#D97706"],[1.0,"#92400E"]],
+                zmin=m_by_state["mean_m"].min() - 0.05,
+                zmax=m_by_state["mean_m"].max() + 0.05,
+                marker_line_color="#FFFFFF",
+                marker_line_width=1.5,
+                colorbar=dict(title=dict(text="Mean M̂", font=dict(size=11)),
+                              thickness=12, len=0.6, tickfont=dict(size=9)),
+                text=m_by_state["hover"],
+                hovertemplate="%{text}<extra></extra>",
+            ))
+            fig_choro.update_layout(
+                height=290,
+                **{k: v for k, v in _layout.items() if k != "margin"},
+                geo=dict(
+                    scope="usa",
+                    bgcolor="#FAFBFD",
+                    lakecolor="#FAFBFD",
+                    landcolor="#F1F5F9",
+                    showlakes=False,
+                    projection_type="albers usa",
+                ),
+                margin=dict(l=0, r=0, t=10, b=0),
+            )
+            st.plotly_chart(fig_choro, use_container_width=True)
+            ca_m = m_by_state.loc[m_by_state["state"]=="CA","mean_m"].values
+            top_st = m_by_state.sort_values("mean_m", ascending=False).iloc[0]
+            if len(ca_m):
+                st.markdown(f"<div style='font-size:.76rem;color:#6B7280;'>"
+                            f"CA dominates at ×{ca_m[0]:.2f} (Wood Shake × High Wildfire). "
+                            f"FL elevated by flood × coastal surge. "
+                            f"Gray states outside 10-state model universe.</div>",
+                            unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # ── Row 1b: State × Peril Interaction Heatmap ────────────────────────────
+        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                    f"color:{TIER_COLORS['tier3']};margin-bottom:2px'>"
+                    "🔥 State × Peril Interaction Heatmap — Where Compound Risk Clusters</div>",
+                    unsafe_allow_html=True)
+        st.markdown("<div style='font-size:.76rem;color:#6B7280;margin-bottom:10px'>"
+                    "Mean M&#x0302; at the intersection of state and high-peril zone. "
+                    "Darker cells = stronger interaction compounding. "
+                    "Blank cells indicate &lt;20 policies (insufficient credibility).</div>",
+                    unsafe_allow_html=True)
+
+        _peril_zones = {"wildfire_zone": "Wildfire", "flood_zone": "Flood",
+                        "earthquake_zone": "Earthquake", "hail_zone": "Hail"}
+        _hm_rows = []
+        for st_code in sorted(data["state"].unique()):
+            st_slice = data[data["state"] == st_code]
+            for col, lbl in _peril_zones.items():
+                sub = st_slice[st_slice[col] == "High"]
+                _hm_rows.append({
+                    "State": st_code, "Peril": lbl + " High",
+                    "Mean_M": sub["M_true"].mean() if len(sub) >= 20 else np.nan,
+                    "Policies": len(sub),
+                })
+        hm_df = pd.DataFrame(_hm_rows)
+        hm_pivot = hm_df.pivot(index="State", columns="Peril", values="Mean_M")
+        hm_count = hm_df.pivot(index="State", columns="Peril", values="Policies")
+
+        # Sort states by row-max M̂ descending for visual impact
+        _row_max = hm_pivot.max(axis=1).sort_values(ascending=True)
+        hm_pivot = hm_pivot.reindex(_row_max.index)
+        hm_count = hm_count.reindex(_row_max.index)
+
+        # Annotation text: "×1.77\n(n=3,490)"
+        annot_text = []
+        for idx in hm_pivot.index:
+            row_txt = []
+            for col in hm_pivot.columns:
+                v = hm_pivot.loc[idx, col]
+                n = int(hm_count.loc[idx, col]) if pd.notna(hm_count.loc[idx, col]) else 0
+                if pd.isna(v):
+                    row_txt.append("—")
+                else:
+                    row_txt.append(f"×{v:.2f}\n({n:,})")
+            annot_text.append(row_txt)
+
+        fig_hm = go.Figure(go.Heatmap(
+            z=hm_pivot.values,
+            x=hm_pivot.columns.tolist(),
+            y=hm_pivot.index.tolist(),
+            colorscale=[[0,"#FEF3C7"],[0.3,"#FBBF24"],[0.6,"#D97706"],[1.0,"#7C2D12"]],
+            zmin=1.8, zmax=hm_pivot.max().max() + 0.15,
+            text=annot_text,
+            texttemplate="%{text}",
+            textfont=dict(size=10),
+            hovertemplate="<b>%{y} × %{x}</b><br>Mean M̂: %{z:.2f}<extra></extra>",
+            colorbar=dict(title=dict(text="Mean M̂", font=dict(size=10)),
+                          thickness=10, len=0.8, tickfont=dict(size=9)),
+            xgap=3, ygap=3,
+        ))
+        fig_hm.update_layout(
+            height=300,
+            **{k: v for k, v in _layout.items() if k != "margin"},
+            margin=dict(l=10, r=10, t=10, b=10),
+            xaxis=dict(showgrid=False, tickfont=dict(size=10), side="bottom"),
+            yaxis=dict(showgrid=False, tickfont=dict(size=10), autorange="reversed"),
+        )
+        st.plotly_chart(fig_hm, use_container_width=True)
+
+        # Dynamic insight caption
+        _hm_flat = hm_df.dropna(subset=["Mean_M"]).sort_values("Mean_M", ascending=False)
+        if len(_hm_flat):
+            top = _hm_flat.iloc[0]
+            st.markdown(
+                f"<div style='font-size:.76rem;color:#6B7280;'>"
+                f"Hottest cell: <b>{top.State} × {top.Peril}</b> at ×{top.Mean_M:.2f} "
+                f"({int(top.Policies):,} policies) — the signature compounding interaction. "
+                f"Same peril in a lower-risk state may show ×0.3–0.5 less multiplier, "
+                f"proving geography amplifies peril severity non-linearly.</div>",
                 unsafe_allow_html=True)
-    st.markdown("<div style='font-size:.76rem;color:#6B7280;margin-bottom:10px'>"
-                "Mean M&#x0302; at the intersection of state and high-peril zone. "
-                "Darker cells = stronger interaction compounding. "
-                "Blank cells indicate &lt;20 policies (insufficient credibility).</div>",
-                unsafe_allow_html=True)
 
-    _peril_zones = {"wildfire_zone": "Wildfire", "flood_zone": "Flood",
-                    "earthquake_zone": "Earthquake", "hail_zone": "Hail"}
-    _hm_rows = []
-    for st_code in sorted(data["state"].unique()):
-        st_slice = data[data["state"] == st_code]
-        for col, lbl in _peril_zones.items():
-            sub = st_slice[st_slice[col] == "High"]
-            _hm_rows.append({
-                "State": st_code, "Peril": lbl + " High",
-                "Mean_M": sub["M_true"].mean() if len(sub) >= 20 else np.nan,
-                "Policies": len(sub),
-            })
-    hm_df = pd.DataFrame(_hm_rows)
-    hm_pivot = hm_df.pivot(index="State", columns="Peril", values="Mean_M")
-    hm_count = hm_df.pivot(index="State", columns="Peril", values="Policies")
+        st.markdown("---")
 
-    # Sort states by row-max M̂ descending for visual impact
-    _row_max = hm_pivot.max(axis=1).sort_values(ascending=True)
-    hm_pivot = hm_pivot.reindex(_row_max.index)
-    hm_count = hm_count.reindex(_row_max.index)
+        # ── Row 2: M̂ vs Expected Loss scatter + Loss ratio by band ───────────────
+        r2c1, r2c2 = st.columns(2)
 
-    # Annotation text: "×1.77\n(n=3,490)"
-    annot_text = []
-    for idx in hm_pivot.index:
-        row_txt = []
-        for col in hm_pivot.columns:
-            v = hm_pivot.loc[idx, col]
-            n = int(hm_count.loc[idx, col]) if pd.notna(hm_count.loc[idx, col]) else 0
-            if pd.isna(v):
-                row_txt.append("—")
-            else:
-                row_txt.append(f"×{v:.2f}\n({n:,})")
-        annot_text.append(row_txt)
+        with r2c1:
+            st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                        f"color:{TIER_COLORS['tier3']};margin-bottom:6px'>"
+                        "M̂ vs Expected Loss — Interaction Uplift Visualised</div>",
+                        unsafe_allow_html=True)
+            samp = data.sample(min(8000, len(data)), random_state=42)
+            fig_scatter = go.Figure(go.Scatter(
+                x=samp["M_true"],
+                y=samp["expected_loss_true"],
+                mode="markers",
+                marker=dict(
+                    color=samp["M_true"],
+                    colorscale=[[0,"#E2E8F0"],[0.5,"#B45309"],[1,"#c0403a"]],
+                    size=4, opacity=0.55,
+                    colorbar=dict(title="M̂", thickness=12,
+                                  tickfont=dict(color="#6B7280")),
+                ),
+                text=[f"State: {r.state}<br>Roof: {r.roof_material}<br>"
+                      f"WF: {r.wildfire_zone}<br>M̂: ×{r.M_true:.2f}<br>"
+                      f"E[L]: ${r.expected_loss_true:,.0f}"
+                      for _, r in samp.iterrows()],
+                hovertemplate="%{text}<extra></extra>",
+            ))
+            fig_scatter.update_layout(
+                height=290, **_layout,
+                xaxis=dict(title="M̂ (Interaction Multiplier)", gridcolor=GRID_COL),
+                yaxis=dict(title="Expected Annual Loss ($)", gridcolor=GRID_COL),
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
-    fig_hm = go.Figure(go.Heatmap(
-        z=hm_pivot.values,
-        x=hm_pivot.columns.tolist(),
-        y=hm_pivot.index.tolist(),
-        colorscale=[[0,"#FEF3C7"],[0.3,"#FBBF24"],[0.6,"#D97706"],[1.0,"#7C2D12"]],
-        zmin=1.8, zmax=hm_pivot.max().max() + 0.15,
-        text=annot_text,
-        texttemplate="%{text}",
-        textfont=dict(size=10),
-        hovertemplate="<b>%{y} × %{x}</b><br>Mean M̂: %{z:.2f}<extra></extra>",
-        colorbar=dict(title=dict(text="Mean M̂", font=dict(size=10)),
-                      thickness=10, len=0.8, tickfont=dict(size=9)),
-        xgap=3, ygap=3,
-    ))
-    fig_hm.update_layout(
-        height=300,
-        **{k: v for k, v in _layout.items() if k != "margin"},
-        margin=dict(l=10, r=10, t=10, b=10),
-        xaxis=dict(showgrid=False, tickfont=dict(size=10), side="bottom"),
-        yaxis=dict(showgrid=False, tickfont=dict(size=10), autorange="reversed"),
-    )
-    st.plotly_chart(fig_hm, use_container_width=True)
+        with r2c2:
+            st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                        f"color:{TIER_COLORS['tier1']};margin-bottom:6px'>"
+                        "Loss Ratio by Risk Band — Model Discrimination</div>",
+                        unsafe_allow_html=True)
+            lr_by_band = data.groupby("risk_band_calc").apply(
+                lambda g: g["expected_loss_true"].sum() / g["indicated_premium"].sum() * 100
+            ).reindex(["Very Low","Low","Moderate","High","Very High"])
+            lr_colors = [BAND_COLORS.get(b, "#1D4ED8") for b in lr_by_band.index]
+            fig_lr = go.Figure(go.Bar(
+                x=lr_by_band.index,
+                y=lr_by_band.values,
+                marker_color=lr_colors,
+                text=[f"{v:.1f}%" for v in lr_by_band.values],
+                textposition="outside",
+            ))
+            fig_lr.add_hline(y=65, line_dash="dash", line_color="#059669",
+                             annotation_text="Target LR 65%",
+                             annotation_font_color="#059669", annotation_font_size=10)
+            fig_lr.add_hline(y=100, line_dash="dot", line_color="#c0403a",
+                             annotation_text="Underwriting loss",
+                             annotation_font_color="#DC2626", annotation_font_size=10)
+            fig_lr.update_layout(
+                height=290, **_layout,
+                yaxis=dict(title="Loss Ratio (%)", gridcolor=GRID_COL),
+                xaxis=dict(showgrid=False),
+            )
+            st.plotly_chart(fig_lr, use_container_width=True)
+            spread = lr_by_band.max() - lr_by_band.min()
+            st.markdown(f"<div style='font-size:.76rem;color:#6B7280;'>"
+                        f"Tier separation: {spread:.0f}pp spread between best and worst bands. "
+                        f"High/Very High bands show loss ratios above 100% — exactly where "
+                        f"Tier 3 interaction effects dominate.</div>",
+                        unsafe_allow_html=True)
 
-    # Dynamic insight caption
-    _hm_flat = hm_df.dropna(subset=["Mean_M"]).sort_values("Mean_M", ascending=False)
-    if len(_hm_flat):
-        top = _hm_flat.iloc[0]
+        st.markdown("---")
+
+        # ── Row 3: Feature distributions with M̂ overlay ──────────────────────────
+        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                    f"color:{TIER_COLORS['tier2']};margin-bottom:6px'>"
+                    "Feature Distribution — Key Risk Variables</div>",
+                    unsafe_allow_html=True)
+
+        fd1, fd2, fd3, fd4 = st.columns(4)
+
+        with fd1:
+            rc = data["roof_material"].value_counts().reset_index()
+            rc.columns = ["Material","Count"]
+            fig_rm = go.Figure(go.Bar(x=rc["Material"], y=rc["Count"],
+                marker_color=["#c0403a" if m=="Wood Shake" else "#1D4ED8" for m in rc["Material"]],
+                text=rc["Count"], textposition="outside"))
+            fig_rm.update_layout(height=220, **_layout, showlegend=False,
+                title=dict(text="Roof Material", font=dict(color="#6B7280",size=11)),
+                xaxis=dict(showgrid=False, tickfont=dict(size=9)),
+                yaxis=dict(gridcolor=GRID_COL))
+            st.plotly_chart(fig_rm, use_container_width=True)
+
+        with fd2:
+            wfc = data["wildfire_zone"].value_counts().reindex(["Low","Moderate","High"]).reset_index()
+            wfc.columns = ["Zone","Count"]
+            fig_wf = go.Figure(go.Bar(x=wfc["Zone"], y=wfc["Count"],
+                marker_color=["#059669","#b89030","#c0403a"],
+                text=wfc["Count"], textposition="outside"))
+            fig_wf.update_layout(height=220, **_layout, showlegend=False,
+                title=dict(text="Wildfire Zone", font=dict(color="#6B7280",size=11)),
+                xaxis=dict(showgrid=False), yaxis=dict(gridcolor=GRID_COL))
+            st.plotly_chart(fig_wf, use_container_width=True)
+
+        with fd3:
+            flc = data["flood_zone"].value_counts().reindex(["Low","Moderate","High"]).reset_index()
+            flc.columns = ["Zone","Count"]
+            fig_fl = go.Figure(go.Bar(x=flc["Zone"], y=flc["Count"],
+                marker_color=["#059669","#1D4ED8","#2d5a9e"],
+                text=flc["Count"], textposition="outside"))
+            fig_fl.update_layout(height=220, **_layout, showlegend=False,
+                title=dict(text="Flood Zone", font=dict(color="#6B7280",size=11)),
+                xaxis=dict(showgrid=False), yaxis=dict(gridcolor=GRID_COL))
+            st.plotly_chart(fig_fl, use_container_width=True)
+
+        with fd4:
+            crc = data["construction_type"].value_counts().reset_index()
+            crc.columns = ["Type","Count"]
+            fig_cc = go.Figure(go.Bar(x=crc["Type"], y=crc["Count"],
+                marker_color=["#7868b8" if t=="Frame" else "#1D4ED8" for t in crc["Type"]],
+                text=crc["Count"], textposition="outside"))
+            fig_cc.update_layout(height=220, **_layout, showlegend=False,
+                title=dict(text="Construction Type", font=dict(color="#6B7280",size=11)),
+                xaxis=dict(showgrid=False, tickfont=dict(size=9)),
+                yaxis=dict(gridcolor=GRID_COL))
+            st.plotly_chart(fig_cc, use_container_width=True)
+
+        st.markdown("---")
+
+        # ── Row 4: Correlation heatmap of key variables ────────────────────────────
+        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
+                    f"color:{TIER_COLORS['tier2']};margin-bottom:6px'>"
+                    "Feature Correlation Matrix — Copula-Encoded Dependencies</div>",
+                    unsafe_allow_html=True)
+
+        corr_feats = ["lambda_true","mu_true","M_true","expected_loss_true",
+                      "roof_age_yr","home_value","prior_claims_3yr",
+                      "credit_score","protection_class","dist_to_fire_station_mi"]
+        corr_labels = ["λ (freq)","μ (sev)","M̂","E[L]",
+                       "Roof Age","Home Value","Prior Claims",
+                       "Credit Score","Protection Class","Fire Dist"]
+
+        corr_df  = data[corr_feats].corr()
+        fig_corr = go.Figure(go.Heatmap(
+            z=corr_df.values,
+            x=corr_labels, y=corr_labels,
+            colorscale=[[0,"#2d5a9e"],[0.5,CARD_BG],[1,"#c0403a"]],
+            zmin=-1, zmax=1,
+            text=corr_df.round(2).values,
+            texttemplate="%{text}",
+            textfont={"size": 9},
+            colorbar=dict(title="ρ", tickfont=dict(color="#6B7280")),
+        ))
+        fig_corr.update_layout(
+            height=350, **_layout,
+            xaxis=dict(showgrid=False, tickfont=dict(size=9)),
+            yaxis=dict(showgrid=False, tickfont=dict(size=9)),
+        )
+        st.plotly_chart(fig_corr, use_container_width=True)
         st.markdown(
-            f"<div style='font-size:.76rem;color:#6B7280;'>"
-            f"Hottest cell: <b>{top.State} × {top.Peril}</b> at ×{top.Mean_M:.2f} "
-            f"({int(top.Policies):,} policies) — the signature compounding interaction. "
-            f"Same peril in a lower-risk state may show ×0.3–0.5 less multiplier, "
-            f"proving geography amplifies peril severity non-linearly.</div>",
+            "<div style='font-size:.76rem;color:#6B7280;'>"
+            "High |ρ| between M&#x0302; and E[L] confirms Tier 3 interactions are the dominant "
+            "driver of total expected loss variance — not λ or μ alone. "
+            "Prior Claims → λ correlation validates the CLUE behavioral signal. "
+            "Credit Score → λ negative correlation is the well-documented adverse selection effect.</div>",
             unsafe_allow_html=True)
 
-    st.markdown("---")
 
-    # ── Row 2: M̂ vs Expected Loss scatter + Loss ratio by band ───────────────
-    r2c1, r2c2 = st.columns(2)
-
-    with r2c1:
-        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                    f"color:{TIER_COLORS['tier3']};margin-bottom:6px'>"
-                    "M̂ vs Expected Loss — Interaction Uplift Visualised</div>",
-                    unsafe_allow_html=True)
-        samp = data.sample(min(8000, len(data)), random_state=42)
-        fig_scatter = go.Figure(go.Scatter(
-            x=samp["M_true"],
-            y=samp["expected_loss_true"],
-            mode="markers",
-            marker=dict(
-                color=samp["M_true"],
-                colorscale=[[0,"#E2E8F0"],[0.5,"#B45309"],[1,"#c0403a"]],
-                size=4, opacity=0.55,
-                colorbar=dict(title="M̂", thickness=12,
-                              tickfont=dict(color="#6B7280")),
-            ),
-            text=[f"State: {r.state}<br>Roof: {r.roof_material}<br>"
-                  f"WF: {r.wildfire_zone}<br>M̂: ×{r.M_true:.2f}<br>"
-                  f"E[L]: ${r.expected_loss_true:,.0f}"
-                  for _, r in samp.iterrows()],
-            hovertemplate="%{text}<extra></extra>",
-        ))
-        fig_scatter.update_layout(
-            height=290, **_layout,
-            xaxis=dict(title="M̂ (Interaction Multiplier)", gridcolor=GRID_COL),
-            yaxis=dict(title="Expected Annual Loss ($)", gridcolor=GRID_COL),
-        )
-        st.plotly_chart(fig_scatter, use_container_width=True)
-
-    with r2c2:
-        st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                    f"color:{TIER_COLORS['tier1']};margin-bottom:6px'>"
-                    "Loss Ratio by Risk Band — Model Discrimination</div>",
-                    unsafe_allow_html=True)
-        lr_by_band = data.groupby("risk_band_calc").apply(
-            lambda g: g["expected_loss_true"].sum() / g["indicated_premium"].sum() * 100
-        ).reindex(["Very Low","Low","Moderate","High","Very High"])
-        lr_colors = [BAND_COLORS.get(b, "#1D4ED8") for b in lr_by_band.index]
-        fig_lr = go.Figure(go.Bar(
-            x=lr_by_band.index,
-            y=lr_by_band.values,
-            marker_color=lr_colors,
-            text=[f"{v:.1f}%" for v in lr_by_band.values],
-            textposition="outside",
-        ))
-        fig_lr.add_hline(y=65, line_dash="dash", line_color="#059669",
-                         annotation_text="Target LR 65%",
-                         annotation_font_color="#059669", annotation_font_size=10)
-        fig_lr.add_hline(y=100, line_dash="dot", line_color="#c0403a",
-                         annotation_text="Underwriting loss",
-                         annotation_font_color="#DC2626", annotation_font_size=10)
-        fig_lr.update_layout(
-            height=290, **_layout,
-            yaxis=dict(title="Loss Ratio (%)", gridcolor=GRID_COL),
-            xaxis=dict(showgrid=False),
-        )
-        st.plotly_chart(fig_lr, use_container_width=True)
-        spread = lr_by_band.max() - lr_by_band.min()
-        st.markdown(f"<div style='font-size:.76rem;color:#6B7280;'>"
-                    f"Tier separation: {spread:.0f}pp spread between best and worst bands. "
-                    f"High/Very High bands show loss ratios above 100% — exactly where "
-                    f"Tier 3 interaction effects dominate.</div>",
-                    unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # ── Row 3: Feature distributions with M̂ overlay ──────────────────────────
-    st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                f"color:{TIER_COLORS['tier2']};margin-bottom:6px'>"
-                "Feature Distribution — Key Risk Variables</div>",
-                unsafe_allow_html=True)
-
-    fd1, fd2, fd3, fd4 = st.columns(4)
-
-    with fd1:
-        rc = data["roof_material"].value_counts().reset_index()
-        rc.columns = ["Material","Count"]
-        fig_rm = go.Figure(go.Bar(x=rc["Material"], y=rc["Count"],
-            marker_color=["#c0403a" if m=="Wood Shake" else "#1D4ED8" for m in rc["Material"]],
-            text=rc["Count"], textposition="outside"))
-        fig_rm.update_layout(height=220, **_layout, showlegend=False,
-            title=dict(text="Roof Material", font=dict(color="#6B7280",size=11)),
-            xaxis=dict(showgrid=False, tickfont=dict(size=9)),
-            yaxis=dict(gridcolor=GRID_COL))
-        st.plotly_chart(fig_rm, use_container_width=True)
-
-    with fd2:
-        wfc = data["wildfire_zone"].value_counts().reindex(["Low","Moderate","High"]).reset_index()
-        wfc.columns = ["Zone","Count"]
-        fig_wf = go.Figure(go.Bar(x=wfc["Zone"], y=wfc["Count"],
-            marker_color=["#059669","#b89030","#c0403a"],
-            text=wfc["Count"], textposition="outside"))
-        fig_wf.update_layout(height=220, **_layout, showlegend=False,
-            title=dict(text="Wildfire Zone", font=dict(color="#6B7280",size=11)),
-            xaxis=dict(showgrid=False), yaxis=dict(gridcolor=GRID_COL))
-        st.plotly_chart(fig_wf, use_container_width=True)
-
-    with fd3:
-        flc = data["flood_zone"].value_counts().reindex(["Low","Moderate","High"]).reset_index()
-        flc.columns = ["Zone","Count"]
-        fig_fl = go.Figure(go.Bar(x=flc["Zone"], y=flc["Count"],
-            marker_color=["#059669","#1D4ED8","#2d5a9e"],
-            text=flc["Count"], textposition="outside"))
-        fig_fl.update_layout(height=220, **_layout, showlegend=False,
-            title=dict(text="Flood Zone", font=dict(color="#6B7280",size=11)),
-            xaxis=dict(showgrid=False), yaxis=dict(gridcolor=GRID_COL))
-        st.plotly_chart(fig_fl, use_container_width=True)
-
-    with fd4:
-        crc = data["construction_type"].value_counts().reset_index()
-        crc.columns = ["Type","Count"]
-        fig_cc = go.Figure(go.Bar(x=crc["Type"], y=crc["Count"],
-            marker_color=["#7868b8" if t=="Frame" else "#1D4ED8" for t in crc["Type"]],
-            text=crc["Count"], textposition="outside"))
-        fig_cc.update_layout(height=220, **_layout, showlegend=False,
-            title=dict(text="Construction Type", font=dict(color="#6B7280",size=11)),
-            xaxis=dict(showgrid=False, tickfont=dict(size=9)),
-            yaxis=dict(gridcolor=GRID_COL))
-        st.plotly_chart(fig_cc, use_container_width=True)
-
-    st.markdown("---")
-
-    # ── Row 4: Correlation heatmap of key variables ────────────────────────────
-    st.markdown(f"<div style='font-size:.84rem;font-weight:600;"
-                f"color:{TIER_COLORS['tier2']};margin-bottom:6px'>"
-                "Feature Correlation Matrix — Copula-Encoded Dependencies</div>",
-                unsafe_allow_html=True)
-
-    corr_feats = ["lambda_true","mu_true","M_true","expected_loss_true",
-                  "roof_age_yr","home_value","prior_claims_3yr",
-                  "credit_score","protection_class","dist_to_fire_station_mi"]
-    corr_labels = ["λ (freq)","μ (sev)","M̂","E[L]",
-                   "Roof Age","Home Value","Prior Claims",
-                   "Credit Score","Protection Class","Fire Dist"]
-
-    corr_df  = data[corr_feats].corr()
-    fig_corr = go.Figure(go.Heatmap(
-        z=corr_df.values,
-        x=corr_labels, y=corr_labels,
-        colorscale=[[0,"#2d5a9e"],[0.5,CARD_BG],[1,"#c0403a"]],
-        zmin=-1, zmax=1,
-        text=corr_df.round(2).values,
-        texttemplate="%{text}",
-        textfont={"size": 9},
-        colorbar=dict(title="ρ", tickfont=dict(color="#6B7280")),
-    ))
-    fig_corr.update_layout(
-        height=350, **_layout,
-        xaxis=dict(showgrid=False, tickfont=dict(size=9)),
-        yaxis=dict(showgrid=False, tickfont=dict(size=9)),
-    )
-    st.plotly_chart(fig_corr, use_container_width=True)
-    st.markdown(
-        "<div style='font-size:.76rem;color:#6B7280;'>"
-        "High |ρ| between M&#x0302; and E[L] confirms Tier 3 interactions are the dominant "
-        "driver of total expected loss variance — not λ or μ alone. "
-        "Prior Claims → λ correlation validates the CLUE behavioral signal. "
-        "Credit Score → λ negative correlation is the well-documented adverse selection effect.</div>",
-        unsafe_allow_html=True)
-
-
-###############################################################################
-# TAB 5 — EXPLAINABILITY & DATA (merged: Explainability + Data & Validation)
-###############################################################################
+    ###############################################################################
+    # TAB 5 — EXPLAINABILITY & DATA (merged: Explainability + Data & Validation)
+    ###############################################################################
 with TABS[4]:
     _etabs = st.tabs(["🔬 SHAP & Attribution", "📋 Data & Validation"])
 
@@ -2750,446 +2749,446 @@ with TABS[4]:
       </span>
     </div>""", unsafe_allow_html=True)
 
-    _ensure_scored(PRICING_CFG)
-    if True:  # always runs — _ensure_scored guarantees result/inp exist
-        res_s = st.session_state["result"]
-        inp_s = st.session_state["inp"]
+        _ensure_scored(PRICING_CFG)
+        if True:  # always runs — _ensure_scored guarantees result/inp exist
+            res_s = st.session_state["result"]
+            inp_s = st.session_state["inp"]
 
-        # ── Unified E[L] attribution waterfall ────────────────────────────────
-        st.markdown("### E[L] Attribution — How Each Factor Drives the Final Premium")
-        st.markdown("""<div class='info-box'>
-        This waterfall shows how each feature <em>shifts the indicated premium</em> away from the
-        portfolio average. Blue bars = Tier 1 property features.
-        Purple bars = Tier 2 behavioural features.
-        <b style='color:#B45309'>Orange bars = Tier 3 interaction effects.</b>
-        </div>""", unsafe_allow_html=True)
-
-        try:
-            from predictor import get_shap_values
-            with st.spinner("Computing SHAP values (this takes ~5 seconds for tree models)…"):
-                shap_out = get_shap_values(inp_s)
-            st.session_state["shap_out"] = shap_out
-        except Exception as e:
-            shap_out = st.session_state.get("shap_out", None)
-            if shap_out is None:
-                st.warning(f"SHAP computation unavailable: {e}. Showing manual feature attribution.")
-
-        # Build manual attribution from known coefficients as fallback / primary display
-        arts_s = load_arts()
-        avg_prem = data["indicated_premium"].mean()
-
-        # Build a readable waterfall from the policy's feature values
-        LR   = PRICING_CFG["target_lr"]
-        EXP  = 1 + PRICING_CFG["expense_load"]
-
-        # Approximate contribution of each major feature to premium deviation from mean
-        def _pct_diff(v, avg, coeff):
-            """Approximate log-linear contribution."""
-            return (v - avg) * coeff
-
-        feature_contribs = []
-
-        # λ drivers
-        lam_avg = data["lambda_true"].mean()
-        if inp_s.get("prior_claims_3yr", 0) > 0:
-            base_c = inp_s["prior_claims_3yr"] * 0.28 * res_s["lambda_pred"] / LR * EXP
-            feature_contribs.append(("Prior Claims (×{})".format(inp_s["prior_claims_3yr"]),
-                                      min(base_c, 1800), TIER_COLORS["tier2"]))
-        if inp_s.get("credit_score", 720) < 680:
-            c = (680 - inp_s["credit_score"]) / 100 * 0.18 * res_s["lambda_pred"] / LR * EXP
-            feature_contribs.append((f"Low Credit ({inp_s['credit_score']})", min(c, 900), TIER_COLORS["tier2"]))
-        if inp_s.get("protection_class", 5) >= 7:
-            c = (inp_s["protection_class"] - 5) * 0.07 * res_s["lambda_pred"] / LR * EXP
-            feature_contribs.append((f"Protection Class {inp_s['protection_class']}", min(c, 600), TIER_COLORS["tier1"]))
-        if inp_s.get("occupancy") == "Vacant":
-            feature_contribs.append(("Vacant Occupancy", 520, TIER_COLORS["tier1"]))
-        if inp_s.get("security_system", 0):
-            feature_contribs.append(("Security System (credit)", -180, TIER_COLORS["tier2"]))
-        if inp_s.get("gated_community", 0):
-            feature_contribs.append(("Gated Community (credit)", -120, TIER_COLORS["tier2"]))
-
-        # μ drivers
-        if inp_s.get("home_age", 25) > 30:
-            c = (inp_s["home_age"] - 25) * 8
-            feature_contribs.append((f"Older Home ({inp_s['home_age']}yr)", min(c, 500), TIER_COLORS["tier1"]))
-        if inp_s.get("dist_to_fire_station_mi", 3) > 5:
-            c = (inp_s["dist_to_fire_station_mi"] - 3) * 60
-            feature_contribs.append((f"Fire Station Dist ({inp_s['dist_to_fire_station_mi']:.1f}mi)", min(c, 600), TIER_COLORS["tier1"]))
-        if inp_s.get("sprinkler_system", 0):
-            feature_contribs.append(("Sprinkler System (credit)", -450, TIER_COLORS["tier2"]))
-        if inp_s.get("smoke_detectors", 1):
-            feature_contribs.append(("Smoke Detectors (credit)", -130, TIER_COLORS["tier2"]))
-
-        # Tier 3 interactions — most important, always show
-        for nm, mult, col, *_ in res_s["interactions"]:
-            t3_contrib = (mult - 1.0) * res_s["expected_loss"] / LR * EXP * 0.7
-            feature_contribs.append((f"⚡ {nm}", min(t3_contrib, 3000), TIER_COLORS["tier3"]))
-
-        # Coverage gap
-        hv = inp_s.get("home_value", 400000)
-        ca = inp_s.get("coverage_amount", 420000)
-        if ca > hv * 1.15:
-            feature_contribs.append(("Coverage Overstatement", min((ca - hv) * 0.002, 600), TIER_COLORS["tier2"]))
-
-        # Pad to 8 items minimum, sort by abs contribution
-        feature_contribs.sort(key=lambda x: abs(x[1]), reverse=True)
-        feature_contribs = feature_contribs[:10]
-
-        # Build waterfall
-        wf_x     = ["Avg Portfolio Premium"] + [f[0] for f in feature_contribs] + ["This Policy"]
-        wf_y     = [avg_prem] + [f[1] for f in feature_contribs] + [None]
-        wf_meas  = ["absolute"] + ["relative"] * len(feature_contribs) + ["total"]
-        wf_txt   = [f"${avg_prem:,.0f}"] + \
-                   [f"+${v:,.0f}" if v >= 0 else f"-${abs(v):,.0f}" for _, v, _ in feature_contribs] + \
-                   [f"${res_s['premium']:,.0f}"]
-        # Build per-bar color list:  [avg_prem_color, ...feature_colors..., total_color]
-        full_bar_colors = [TIER_COLORS["premium"]]   # Avg Portfolio Premium
-        for nm, v, col in feature_contribs:
-            if v < 0:
-                full_bar_colors.append("#059669")     # credits always green
-            else:
-                full_bar_colors.append(col)           # tier-specific color
-        full_bar_colors.append(TIER_COLORS["premium"])  # This Policy (total)
-
-        # ── Manual waterfall via stacked bars (go.Waterfall lacks per-bar color) ──
-        _wf2_bases, _wf2_heights = [], []
-        _cum2 = 0
-        for i, (meas, val) in enumerate(zip(wf_meas, wf_y)):
-            if meas == "absolute":
-                _wf2_bases.append(0)
-                _wf2_heights.append(val)
-                _cum2 = val
-            elif meas == "total":
-                final_val = sum(v for v in wf_y if v is not None)
-                # Total = absolute + all relatives
-                _wf2_bases.append(0)
-                _wf2_heights.append(res_s["premium"])
-                _cum2 = res_s["premium"]
-            else:  # relative
-                if val >= 0:
-                    _wf2_bases.append(_cum2)
-                    _wf2_heights.append(val)
-                    _cum2 += val
-                else:
-                    _cum2 += val
-                    _wf2_bases.append(_cum2)
-                    _wf2_heights.append(abs(val))
-        fig_wf = go.Figure()
-        # invisible base
-        fig_wf.add_trace(go.Bar(
-            x=wf_x, y=_wf2_bases,
-            marker_color="rgba(0,0,0,0)", showlegend=False,
-            hoverinfo="skip",
-        ))
-        # visible coloured bars
-        fig_wf.add_trace(go.Bar(
-            x=wf_x, y=_wf2_heights,
-            marker_color=full_bar_colors,
-            text=wf_txt, textposition="outside",
-            showlegend=False,
-        ))
-        fig_wf.update_layout(
-            barmode="stack", height=400, **_layout,
-            yaxis=dict(title="Indicated Annual Premium ($)", gridcolor=GRID_COL),
-            xaxis=dict(showgrid=False, tickfont=dict(size=10), tickangle=-30),
-        )
-        st.plotly_chart(fig_wf, use_container_width=True)
-
-        # Legend
-        st.markdown(f"""<div style='display:flex;gap:20px;flex-wrap:wrap;
-          font-size:.78rem;margin-top:-8px;margin-bottom:12px'>
-          <span style='color:{TIER_COLORS["tier1"]}'>■ Tier 1 — Structural</span>
-          <span style='color:{TIER_COLORS["tier2"]}'>■ Tier 2 — Behavioural</span>
-          <span style='color:{TIER_COLORS["tier3"]}'>■ Tier 3 — Interaction Effects</span>
-          <span style='color:#059669'>■ Risk Mitigants (credits)</span>
-          <span style='color:{TIER_COLORS["premium"]}'>■ Final Premium</span>
-        </div>""", unsafe_allow_html=True)
-
-        # ── Per-model SHAP detail ──────────────────────────────────────────────
-        st.markdown("---")
-        st.markdown("### Per-Model Detail — GLM Rate Relativities + M̂ Interaction Layer")
-        st.markdown("""<div class='info-box'>
-        <b style='color:#1D4ED8'>GLM Rate Relativities (Regulatory Layer)</b> — exact SHAP from
-        the Poisson/Gamma GLM; every bar maps 1-to-1 to a named exp(β) rate relativity.
-        This is the chart a Chief Actuary files with the DOI.<br>
-        <b style='color:#B45309'>M̂ Interaction Layer (T3 co-exposures)</b> — TreeExplainer SHAP
-        showing which compound-peril features drove M̂ above 1.0.
-        This is the interaction discovery story for the BD audience.
-        </div>""", unsafe_allow_html=True)
-
-        shap_out = st.session_state.get("shap_out", None)
-
-        if shap_out:
-            exp_tabs = st.tabs([
-                "📐 GLM Rate Relativities (Regulatory)",
-                "⚡ M̂ Interaction Layer (T3)",
-                "λ Frequency Detail",
-                "μ Severity Detail",
-            ])
-
-            # ── Tab 0: GLM SHAP — the regulatory lead ─────────────────────────
-            with exp_tabs[0]:
-                st.markdown(f"""<div class='ok-box'>
-                Every bar below is a coefficient from the Poisson/Gamma GLM — the same
-                model that produces the rate-filing relativities. SHAP values for linear
-                models are exact (O(M) computation, no approximation). A Chief Actuary
-                can write each value directly into an actuarial memorandum.
-                </div>""", unsafe_allow_html=True)
-                glm_key = "Poisson GLM (λ_GLM)" if "Poisson GLM (λ_GLM)" in shap_out else "Frequency (λ)"
-                if glm_key in shap_out:
-                    sv   = shap_out[glm_key]
-                    vals = np.array(sv["values"])
-                    feat = sv["features"]
-                    base = sv["base"]
-                    shap_df = pd.DataFrame({
-                        "Feature": feat,
-                        "SHAP Value": vals,
-                        "Abs": np.abs(vals),
-                    }).sort_values("Abs", ascending=False).head(15)
-                    fig_glm_shap = go.Figure(go.Bar(
-                        x=shap_df["SHAP Value"],
-                        y=shap_df["Feature"],
-                        orientation="h",
-                        marker_color=[TIER_COLORS["tier1"] if v >= 0 else "#059669"
-                                      for v in shap_df["SHAP Value"]],
-                        text=[f"{v:+.4f}" for v in shap_df["SHAP Value"]],
-                        textposition="outside",
-                    ))
-                    fig_glm_shap.add_vline(x=0, line_color="#9CA3AF", line_width=1)
-                    fig_glm_shap.update_layout(
-                        height=380, **_layout,
-                        title=dict(
-                            text="GLM (Poisson/Gamma) — SHAP Rate Relativities · Regulatory Filing Layer",
-                            font=dict(color="#6B7280", size=12)
-                        ),
-                        xaxis=dict(title="SHAP Value (log scale)", gridcolor=GRID_COL),
-                        yaxis=dict(showgrid=False, autorange="reversed"),
-                    )
-                    st.plotly_chart(fig_glm_shap, use_container_width=True)
-                    st.markdown(
-                        f"<div style='font-size:.76rem;color:#6B7280;'>"
-                        f"Base value: {base:.4f} — these SHAP values sum exactly to "
-                        f"log(GLM_prediction) − log(base_rate). "
-                        f"Each positive bar = a risk-loading relativity; each negative bar = a credit. "
-                        f"<b style='color:#1D4ED8'>No T3 features appear here</b> — "
-                        f"their signal lives entirely in the M̂ layer.</div>",
-                        unsafe_allow_html=True)
-                else:
-                    st.info("GLM SHAP not yet available — run a prediction in Tab 1 first.")
-
-            # ── Tab 1: M̂ SHAP — the interaction discovery story ───────────────
-            with exp_tabs[1]:
-                st.markdown(f"""<div class='t3-box'>
-                These SHAP values explain <b>why M̂ is above (or below) 1.0</b> for this property.
-                Top features should be the compound-peril T3 co-exposures — wildfire zone ×
-                roof material, flood × coastal proximity, etc.
-                For the Paradise CA property, the top two bars should be
-                <b>roof_material</b> and <b>wildfire_zone</b>.
-                </div>""", unsafe_allow_html=True)
-                mhat_key = "M-hat (M̂)"
-                if mhat_key in shap_out:
-                    sv   = shap_out[mhat_key]
-                    vals = np.array(sv["values"])
-                    feat = sv["features"]
-                    base = sv["base"]
-                    shap_df = pd.DataFrame({
-                        "Feature": feat,
-                        "SHAP Value": vals,
-                        "Abs": np.abs(vals),
-                    }).sort_values("Abs", ascending=False).head(15)
-                    fig_mhat_shap = go.Figure(go.Bar(
-                        x=shap_df["SHAP Value"],
-                        y=shap_df["Feature"],
-                        orientation="h",
-                        marker_color=[TIER_COLORS["tier3"] if v >= 0 else "#059669"
-                                      for v in shap_df["SHAP Value"]],
-                        text=[f"{v:+.4f}" for v in shap_df["SHAP Value"]],
-                        textposition="outside",
-                    ))
-                    fig_mhat_shap.add_vline(x=0, line_color="#9CA3AF", line_width=1)
-                    fig_mhat_shap.update_layout(
-                        height=380, **_layout,
-                        title=dict(
-                            text="M̂ Ensemble — SHAP Feature Importance · Interaction Discovery Layer (T3 co-exposures)",
-                            font=dict(color="#6B7280", size=12)
-                        ),
-                        xaxis=dict(title="SHAP Value (log M̂ scale)", gridcolor=GRID_COL),
-                        yaxis=dict(showgrid=False, autorange="reversed"),
-                    )
-                    st.plotly_chart(fig_mhat_shap, use_container_width=True)
-                    st.markdown(
-                        f"<div style='font-size:.76rem;color:#6B7280;'>"
-                        f"Base value: {base:.4f} — SHAP pushes M̂ prediction "
-                        f"{'+' if vals.sum() >= 0 else ''}{vals.sum():.4f} from the M̂ baseline. "
-                        f"<b style='color:#B45309'>Orange bars</b> = T3 interactions that compound risk above the GLM. "
-                        f"<b style='color:#059669'>Green bars</b> = protective effects (defensible space, metal roof, etc.).</div>",
-                        unsafe_allow_html=True)
-                else:
-                    st.info(f"M̂ SHAP not available for this property.")
-
-            # ── Tabs 2+3: λ and μ detail (display-only diagnostics) ───────────
-            for ti, (tab_obj, model_name, color, label) in enumerate(zip(
-                exp_tabs[2:],
-                ["Frequency (λ)", "Severity (μ)"],
-                [TIER_COLORS["lambda"], TIER_COLORS["mu"]],
-                ["λ Frequency (Poisson GLM — display diagnostic)",
-                 "μ Severity (Gamma GLM — display diagnostic)"],
-            )):
-                with tab_obj:
-                    st.caption(f"Display-only diagnostic — not in the live pricing chain. "
-                               f"Shown for completeness; the combined Poisson×Gamma GLM prediction "
-                               f"is what drives E[L] = GLM × M̂.")
-                    if model_name not in shap_out:
-                        st.info(f"SHAP values not available for {model_name}")
-                        continue
-                    sv   = shap_out[model_name]
-                    vals = np.array(sv["values"])
-                    feat = sv["features"]
-                    base = sv["base"]
-                    shap_df = pd.DataFrame({
-                        "Feature": feat,
-                        "SHAP Value": vals,
-                        "Abs": np.abs(vals),
-                    }).sort_values("Abs", ascending=False).head(15)
-                    fig_shap = go.Figure(go.Bar(
-                        x=shap_df["SHAP Value"],
-                        y=shap_df["Feature"],
-                        orientation="h",
-                        marker_color=[color if v >= 0 else "#059669"
-                                      for v in shap_df["SHAP Value"]],
-                        text=[f"{v:+.4f}" for v in shap_df["SHAP Value"]],
-                        textposition="outside",
-                    ))
-                    fig_shap.add_vline(x=0, line_color="#9CA3AF", line_width=1)
-                    fig_shap.update_layout(
-                        height=360, **_layout,
-                        title=dict(
-                            text=f"{label} — SHAP Feature Importance for This Policy",
-                            font=dict(color="#6B7280", size=12)
-                        ),
-                        xaxis=dict(title="SHAP Value (log scale)", gridcolor=GRID_COL),
-                        yaxis=dict(showgrid=False, autorange="reversed"),
-                    )
-                    st.plotly_chart(fig_shap, use_container_width=True)
-                    st.markdown(
-                        f"<div style='font-size:.76rem;color:#6B7280;'>"
-                        f"Base value: {base:.4f} — SHAP pushes the prediction "
-                        f"{'+' if vals.sum() >= 0 else ''}{vals.sum():.4f} from the baseline.</div>",
-                        unsafe_allow_html=True)
-        else:
-            # Fallback: show model-native feature importance from artifacts
+            # ── Unified E[L] attribution waterfall ────────────────────────────────
+            st.markdown("### E[L] Attribution — How Each Factor Drives the Final Premium")
             st.markdown("""<div class='info-box'>
-            SHAP package not available — showing model-native feature importances instead.
-            The <b>GLM layer</b> shows T1+T2 coefficient magnitudes (regulatory filing layer).
-            The <b>M̂ layer</b> shows T3 ensemble importances (interaction discovery layer).
+            This waterfall shows how each feature <em>shifts the indicated premium</em> away from the
+            portfolio average. Blue bars = Tier 1 property features.
+            Purple bars = Tier 2 behavioural features.
+            <b style='color:#B45309'>Orange bars = Tier 3 interaction effects.</b>
             </div>""", unsafe_allow_html=True)
-            exp_tabs = st.tabs([
-                "📐 GLM Rate Relativities (Regulatory)",
-                "⚡ M̂ Interaction Layer (T3)",
-            ])
-            for tab_obj, (model_key, feat_key, label, color) in zip(
-                exp_tabs,
-                [
-                    ("glm",   "t12", "GLM (Poisson/Gamma) — T1+T2 Rate Relativities · Regulatory Filing Layer",
-                     TIER_COLORS["tier1"]),
-                    ("xgb_m", "t3",  "M̂ Ensemble — T3 Interaction Discovery Layer",
-                     TIER_COLORS["tier3"]),
-                ],
-            ):
-                with tab_obj:
-                    try:
-                        model = arts_s[model_key]
-                        feats = arts_s[feat_key]
-                        # GLM: use |coef_| as importance proxy; tree models: feature_importances_
-                        if hasattr(model, "coef_"):
-                            fi = np.abs(model.coef_)
-                        else:
-                            fi = model.feature_importances_
-                        fi_df = pd.DataFrame({"Feature": feats, "Importance": fi}
-                                ).sort_values("Importance", ascending=False).head(15)
-                        fig_fi = go.Figure(go.Bar(
-                            x=fi_df["Importance"], y=fi_df["Feature"],
+
+            try:
+                from predictor import get_shap_values
+                with st.spinner("Computing SHAP values (this takes ~5 seconds for tree models)…"):
+                    shap_out = get_shap_values(inp_s)
+                st.session_state["shap_out"] = shap_out
+            except Exception as e:
+                shap_out = st.session_state.get("shap_out", None)
+                if shap_out is None:
+                    st.warning(f"SHAP computation unavailable: {e}. Showing manual feature attribution.")
+
+            # Build manual attribution from known coefficients as fallback / primary display
+            arts_s = load_arts()
+            avg_prem = data["indicated_premium"].mean()
+
+            # Build a readable waterfall from the policy's feature values
+            LR   = PRICING_CFG["target_lr"]
+            EXP  = 1 + PRICING_CFG["expense_load"]
+
+            # Approximate contribution of each major feature to premium deviation from mean
+            def _pct_diff(v, avg, coeff):
+                """Approximate log-linear contribution."""
+                return (v - avg) * coeff
+
+            feature_contribs = []
+
+            # λ drivers
+            lam_avg = data["lambda_true"].mean()
+            if inp_s.get("prior_claims_3yr", 0) > 0:
+                base_c = inp_s["prior_claims_3yr"] * 0.28 * res_s["lambda_pred"] / LR * EXP
+                feature_contribs.append(("Prior Claims (×{})".format(inp_s["prior_claims_3yr"]),
+                                          min(base_c, 1800), TIER_COLORS["tier2"]))
+            if inp_s.get("credit_score", 720) < 680:
+                c = (680 - inp_s["credit_score"]) / 100 * 0.18 * res_s["lambda_pred"] / LR * EXP
+                feature_contribs.append((f"Low Credit ({inp_s['credit_score']})", min(c, 900), TIER_COLORS["tier2"]))
+            if inp_s.get("protection_class", 5) >= 7:
+                c = (inp_s["protection_class"] - 5) * 0.07 * res_s["lambda_pred"] / LR * EXP
+                feature_contribs.append((f"Protection Class {inp_s['protection_class']}", min(c, 600), TIER_COLORS["tier1"]))
+            if inp_s.get("occupancy") == "Vacant":
+                feature_contribs.append(("Vacant Occupancy", 520, TIER_COLORS["tier1"]))
+            if inp_s.get("security_system", 0):
+                feature_contribs.append(("Security System (credit)", -180, TIER_COLORS["tier2"]))
+            if inp_s.get("gated_community", 0):
+                feature_contribs.append(("Gated Community (credit)", -120, TIER_COLORS["tier2"]))
+
+            # μ drivers
+            if inp_s.get("home_age", 25) > 30:
+                c = (inp_s["home_age"] - 25) * 8
+                feature_contribs.append((f"Older Home ({inp_s['home_age']}yr)", min(c, 500), TIER_COLORS["tier1"]))
+            if inp_s.get("dist_to_fire_station_mi", 3) > 5:
+                c = (inp_s["dist_to_fire_station_mi"] - 3) * 60
+                feature_contribs.append((f"Fire Station Dist ({inp_s['dist_to_fire_station_mi']:.1f}mi)", min(c, 600), TIER_COLORS["tier1"]))
+            if inp_s.get("sprinkler_system", 0):
+                feature_contribs.append(("Sprinkler System (credit)", -450, TIER_COLORS["tier2"]))
+            if inp_s.get("smoke_detectors", 1):
+                feature_contribs.append(("Smoke Detectors (credit)", -130, TIER_COLORS["tier2"]))
+
+            # Tier 3 interactions — most important, always show
+            for nm, mult, col, *_ in res_s["interactions"]:
+                t3_contrib = (mult - 1.0) * res_s["expected_loss"] / LR * EXP * 0.7
+                feature_contribs.append((f"⚡ {nm}", min(t3_contrib, 3000), TIER_COLORS["tier3"]))
+
+            # Coverage gap
+            hv = inp_s.get("home_value", 400000)
+            ca = inp_s.get("coverage_amount", 420000)
+            if ca > hv * 1.15:
+                feature_contribs.append(("Coverage Overstatement", min((ca - hv) * 0.002, 600), TIER_COLORS["tier2"]))
+
+            # Pad to 8 items minimum, sort by abs contribution
+            feature_contribs.sort(key=lambda x: abs(x[1]), reverse=True)
+            feature_contribs = feature_contribs[:10]
+
+            # Build waterfall
+            wf_x     = ["Avg Portfolio Premium"] + [f[0] for f in feature_contribs] + ["This Policy"]
+            wf_y     = [avg_prem] + [f[1] for f in feature_contribs] + [None]
+            wf_meas  = ["absolute"] + ["relative"] * len(feature_contribs) + ["total"]
+            wf_txt   = [f"${avg_prem:,.0f}"] + \
+                       [f"+${v:,.0f}" if v >= 0 else f"-${abs(v):,.0f}" for _, v, _ in feature_contribs] + \
+                       [f"${res_s['premium']:,.0f}"]
+            # Build per-bar color list:  [avg_prem_color, ...feature_colors..., total_color]
+            full_bar_colors = [TIER_COLORS["premium"]]   # Avg Portfolio Premium
+            for nm, v, col in feature_contribs:
+                if v < 0:
+                    full_bar_colors.append("#059669")     # credits always green
+                else:
+                    full_bar_colors.append(col)           # tier-specific color
+            full_bar_colors.append(TIER_COLORS["premium"])  # This Policy (total)
+
+            # ── Manual waterfall via stacked bars (go.Waterfall lacks per-bar color) ──
+            _wf2_bases, _wf2_heights = [], []
+            _cum2 = 0
+            for i, (meas, val) in enumerate(zip(wf_meas, wf_y)):
+                if meas == "absolute":
+                    _wf2_bases.append(0)
+                    _wf2_heights.append(val)
+                    _cum2 = val
+                elif meas == "total":
+                    final_val = sum(v for v in wf_y if v is not None)
+                    # Total = absolute + all relatives
+                    _wf2_bases.append(0)
+                    _wf2_heights.append(res_s["premium"])
+                    _cum2 = res_s["premium"]
+                else:  # relative
+                    if val >= 0:
+                        _wf2_bases.append(_cum2)
+                        _wf2_heights.append(val)
+                        _cum2 += val
+                    else:
+                        _cum2 += val
+                        _wf2_bases.append(_cum2)
+                        _wf2_heights.append(abs(val))
+            fig_wf = go.Figure()
+            # invisible base
+            fig_wf.add_trace(go.Bar(
+                x=wf_x, y=_wf2_bases,
+                marker_color="rgba(0,0,0,0)", showlegend=False,
+                hoverinfo="skip",
+            ))
+            # visible coloured bars
+            fig_wf.add_trace(go.Bar(
+                x=wf_x, y=_wf2_heights,
+                marker_color=full_bar_colors,
+                text=wf_txt, textposition="outside",
+                showlegend=False,
+            ))
+            fig_wf.update_layout(
+                barmode="stack", height=400, **_layout,
+                yaxis=dict(title="Indicated Annual Premium ($)", gridcolor=GRID_COL),
+                xaxis=dict(showgrid=False, tickfont=dict(size=10), tickangle=-30),
+            )
+            st.plotly_chart(fig_wf, use_container_width=True)
+
+            # Legend
+            st.markdown(f"""<div style='display:flex;gap:20px;flex-wrap:wrap;
+              font-size:.78rem;margin-top:-8px;margin-bottom:12px'>
+              <span style='color:{TIER_COLORS["tier1"]}'>■ Tier 1 — Structural</span>
+              <span style='color:{TIER_COLORS["tier2"]}'>■ Tier 2 — Behavioural</span>
+              <span style='color:{TIER_COLORS["tier3"]}'>■ Tier 3 — Interaction Effects</span>
+              <span style='color:#059669'>■ Risk Mitigants (credits)</span>
+              <span style='color:{TIER_COLORS["premium"]}'>■ Final Premium</span>
+            </div>""", unsafe_allow_html=True)
+
+            # ── Per-model SHAP detail ──────────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("### Per-Model Detail — GLM Rate Relativities + M̂ Interaction Layer")
+            st.markdown("""<div class='info-box'>
+            <b style='color:#1D4ED8'>GLM Rate Relativities (Regulatory Layer)</b> — exact SHAP from
+            the Poisson/Gamma GLM; every bar maps 1-to-1 to a named exp(β) rate relativity.
+            This is the chart a Chief Actuary files with the DOI.<br>
+            <b style='color:#B45309'>M̂ Interaction Layer (T3 co-exposures)</b> — TreeExplainer SHAP
+            showing which compound-peril features drove M̂ above 1.0.
+            This is the interaction discovery story for the BD audience.
+            </div>""", unsafe_allow_html=True)
+
+            shap_out = st.session_state.get("shap_out", None)
+
+            if shap_out:
+                exp_tabs = st.tabs([
+                    "📐 GLM Rate Relativities (Regulatory)",
+                    "⚡ M̂ Interaction Layer (T3)",
+                    "λ Frequency Detail",
+                    "μ Severity Detail",
+                ])
+
+                # ── Tab 0: GLM SHAP — the regulatory lead ─────────────────────────
+                with exp_tabs[0]:
+                    st.markdown(f"""<div class='ok-box'>
+                    Every bar below is a coefficient from the Poisson/Gamma GLM — the same
+                    model that produces the rate-filing relativities. SHAP values for linear
+                    models are exact (O(M) computation, no approximation). A Chief Actuary
+                    can write each value directly into an actuarial memorandum.
+                    </div>""", unsafe_allow_html=True)
+                    glm_key = "Poisson GLM (λ_GLM)" if "Poisson GLM (λ_GLM)" in shap_out else "Frequency (λ)"
+                    if glm_key in shap_out:
+                        sv   = shap_out[glm_key]
+                        vals = np.array(sv["values"])
+                        feat = sv["features"]
+                        base = sv["base"]
+                        shap_df = pd.DataFrame({
+                            "Feature": feat,
+                            "SHAP Value": vals,
+                            "Abs": np.abs(vals),
+                        }).sort_values("Abs", ascending=False).head(15)
+                        fig_glm_shap = go.Figure(go.Bar(
+                            x=shap_df["SHAP Value"],
+                            y=shap_df["Feature"],
                             orientation="h",
-                            marker_color=color,
-                            text=[f"{v:.4f}" for v in fi_df["Importance"]],
+                            marker_color=[TIER_COLORS["tier1"] if v >= 0 else "#059669"
+                                          for v in shap_df["SHAP Value"]],
+                            text=[f"{v:+.4f}" for v in shap_df["SHAP Value"]],
                             textposition="outside",
                         ))
-                        fig_fi.update_layout(
-                            height=360, **_layout,
+                        fig_glm_shap.add_vline(x=0, line_color="#9CA3AF", line_width=1)
+                        fig_glm_shap.update_layout(
+                            height=380, **_layout,
                             title=dict(
-                                text=label,
+                                text="GLM (Poisson/Gamma) — SHAP Rate Relativities · Regulatory Filing Layer",
                                 font=dict(color="#6B7280", size=12)
                             ),
-                            xaxis=dict(title="Importance / |Coefficient|", gridcolor=GRID_COL),
+                            xaxis=dict(title="SHAP Value (log scale)", gridcolor=GRID_COL),
                             yaxis=dict(showgrid=False, autorange="reversed"),
                         )
-                        st.plotly_chart(fig_fi, use_container_width=True)
-                    except Exception as ex:
-                        st.info(f"Feature importances not available: {ex}")
+                        st.plotly_chart(fig_glm_shap, use_container_width=True)
+                        st.markdown(
+                            f"<div style='font-size:.76rem;color:#6B7280;'>"
+                            f"Base value: {base:.4f} — these SHAP values sum exactly to "
+                            f"log(GLM_prediction) − log(base_rate). "
+                            f"Each positive bar = a risk-loading relativity; each negative bar = a credit. "
+                            f"<b style='color:#1D4ED8'>No T3 features appear here</b> — "
+                            f"their signal lives entirely in the M̂ layer.</div>",
+                            unsafe_allow_html=True)
+                    else:
+                        st.info("GLM SHAP not yet available — run a prediction in Tab 1 first.")
 
-        # ── Interaction decomposition table ────────────────────────────────────
-        st.markdown("---")
-        st.markdown("### ⚡ Tier 3 Interaction Decomposition")
+                # ── Tab 1: M̂ SHAP — the interaction discovery story ───────────────
+                with exp_tabs[1]:
+                    st.markdown(f"""<div class='t3-box'>
+                    These SHAP values explain <b>why M̂ is above (or below) 1.0</b> for this property.
+                    Top features should be the compound-peril T3 co-exposures — wildfire zone ×
+                    roof material, flood × coastal proximity, etc.
+                    For the Paradise CA property, the top two bars should be
+                    <b>roof_material</b> and <b>wildfire_zone</b>.
+                    </div>""", unsafe_allow_html=True)
+                    mhat_key = "M-hat (M̂)"
+                    if mhat_key in shap_out:
+                        sv   = shap_out[mhat_key]
+                        vals = np.array(sv["values"])
+                        feat = sv["features"]
+                        base = sv["base"]
+                        shap_df = pd.DataFrame({
+                            "Feature": feat,
+                            "SHAP Value": vals,
+                            "Abs": np.abs(vals),
+                        }).sort_values("Abs", ascending=False).head(15)
+                        fig_mhat_shap = go.Figure(go.Bar(
+                            x=shap_df["SHAP Value"],
+                            y=shap_df["Feature"],
+                            orientation="h",
+                            marker_color=[TIER_COLORS["tier3"] if v >= 0 else "#059669"
+                                          for v in shap_df["SHAP Value"]],
+                            text=[f"{v:+.4f}" for v in shap_df["SHAP Value"]],
+                            textposition="outside",
+                        ))
+                        fig_mhat_shap.add_vline(x=0, line_color="#9CA3AF", line_width=1)
+                        fig_mhat_shap.update_layout(
+                            height=380, **_layout,
+                            title=dict(
+                                text="M̂ Ensemble — SHAP Feature Importance · Interaction Discovery Layer (T3 co-exposures)",
+                                font=dict(color="#6B7280", size=12)
+                            ),
+                            xaxis=dict(title="SHAP Value (log M̂ scale)", gridcolor=GRID_COL),
+                            yaxis=dict(showgrid=False, autorange="reversed"),
+                        )
+                        st.plotly_chart(fig_mhat_shap, use_container_width=True)
+                        st.markdown(
+                            f"<div style='font-size:.76rem;color:#6B7280;'>"
+                            f"Base value: {base:.4f} — SHAP pushes M̂ prediction "
+                            f"{'+' if vals.sum() >= 0 else ''}{vals.sum():.4f} from the M̂ baseline. "
+                            f"<b style='color:#B45309'>Orange bars</b> = T3 interactions that compound risk above the GLM. "
+                            f"<b style='color:#059669'>Green bars</b> = protective effects (defensible space, metal roof, etc.).</div>",
+                            unsafe_allow_html=True)
+                    else:
+                        st.info(f"M̂ SHAP not available for this property.")
 
-        if res_s["interactions"]:
-            ix_rows = []
-            base_el  = res_s["lambda_pred"] * res_s["mu_pred"]
-            for nm, mult, col, *_ in res_s["interactions"]:
-                contribution_el   = base_el * (mult - 1.0)
-                contribution_prem = contribution_el / PRICING_CFG["target_lr"]
-                if PRICING_CFG["expense_load"] > 0:
-                    contribution_prem *= (1 + PRICING_CFG["expense_load"])
-                ix_rows.append({
-                    "Interaction": nm,
-                    "M̂ Multiplier": f"×{mult:.2f}",
-                    "E[L] Added ($)": f"${contribution_el:,.0f}",
-                    "Premium Added ($)": f"${contribution_prem:,.0f}",
-                    "Business Logic": {
-                        "Wood Shake × High Wildfire":
-                            "Embers ignite degraded shingles at WUI. Camp Fire proof-case.",
-                        "Wood Shake × Mod Wildfire":
-                            "Elevated ignition risk — ember transport over moderate distances.",
-                        "Non-Wood × High Wildfire":
-                            "Even resilient roofs exposed in extreme fire behaviour.",
-                        "High Flood × Coastal <5mi":
-                            "Storm surge amplifies flood losses non-linearly.",
-                        "High Flood Zone":
-                            "Pluvial and fluvial flood risk — pre-code foundations compound.",
-                        "Moderate Flood Zone":
-                            "Surface drainage risk; moderate foundation interaction.",
-                        "High Earthquake Zone":
-                            "Seismic + structural damage from sub-standard build era.",
-                        "Moderate Earthquake Zone":
-                            "Moderate seismic exposure; masonry construction amplifies.",
-                        "Old Roof (>20yr) × Frame":
-                            "Frame shrinkage + aged roofing = water intrusion cycle.",
-                        "Aged Roof > 20 years":
-                            "Granule loss accelerates hail damage penetration.",
-                        "Wood Shake (base fire risk)":
-                            "Ignition temperature 128°C lower than asphalt shingle.",
-                    }.get(nm, "Compound peril co-exposure"),
-                })
-            ix_df = pd.DataFrame(ix_rows)
-            st.dataframe(ix_df, use_container_width=True, hide_index=True)
+                # ── Tabs 2+3: λ and μ detail (display-only diagnostics) ───────────
+                for ti, (tab_obj, model_name, color, label) in enumerate(zip(
+                    exp_tabs[2:],
+                    ["Frequency (λ)", "Severity (μ)"],
+                    [TIER_COLORS["lambda"], TIER_COLORS["mu"]],
+                    ["λ Frequency (Poisson GLM — display diagnostic)",
+                     "μ Severity (Gamma GLM — display diagnostic)"],
+                )):
+                    with tab_obj:
+                        st.caption(f"Display-only diagnostic — not in the live pricing chain. "
+                                   f"Shown for completeness; the combined Poisson×Gamma GLM prediction "
+                                   f"is what drives E[L] = GLM × M̂.")
+                        if model_name not in shap_out:
+                            st.info(f"SHAP values not available for {model_name}")
+                            continue
+                        sv   = shap_out[model_name]
+                        vals = np.array(sv["values"])
+                        feat = sv["features"]
+                        base = sv["base"]
+                        shap_df = pd.DataFrame({
+                            "Feature": feat,
+                            "SHAP Value": vals,
+                            "Abs": np.abs(vals),
+                        }).sort_values("Abs", ascending=False).head(15)
+                        fig_shap = go.Figure(go.Bar(
+                            x=shap_df["SHAP Value"],
+                            y=shap_df["Feature"],
+                            orientation="h",
+                            marker_color=[color if v >= 0 else "#059669"
+                                          for v in shap_df["SHAP Value"]],
+                            text=[f"{v:+.4f}" for v in shap_df["SHAP Value"]],
+                            textposition="outside",
+                        ))
+                        fig_shap.add_vline(x=0, line_color="#9CA3AF", line_width=1)
+                        fig_shap.update_layout(
+                            height=360, **_layout,
+                            title=dict(
+                                text=f"{label} — SHAP Feature Importance for This Policy",
+                                font=dict(color="#6B7280", size=12)
+                            ),
+                            xaxis=dict(title="SHAP Value (log scale)", gridcolor=GRID_COL),
+                            yaxis=dict(showgrid=False, autorange="reversed"),
+                        )
+                        st.plotly_chart(fig_shap, use_container_width=True)
+                        st.markdown(
+                            f"<div style='font-size:.76rem;color:#6B7280;'>"
+                            f"Base value: {base:.4f} — SHAP pushes the prediction "
+                            f"{'+' if vals.sum() >= 0 else ''}{vals.sum():.4f} from the baseline.</div>",
+                            unsafe_allow_html=True)
+            else:
+                # Fallback: show model-native feature importance from artifacts
+                st.markdown("""<div class='info-box'>
+                SHAP package not available — showing model-native feature importances instead.
+                The <b>GLM layer</b> shows T1+T2 coefficient magnitudes (regulatory filing layer).
+                The <b>M̂ layer</b> shows T3 ensemble importances (interaction discovery layer).
+                </div>""", unsafe_allow_html=True)
+                exp_tabs = st.tabs([
+                    "📐 GLM Rate Relativities (Regulatory)",
+                    "⚡ M̂ Interaction Layer (T3)",
+                ])
+                for tab_obj, (model_key, feat_key, label, color) in zip(
+                    exp_tabs,
+                    [
+                        ("glm",   "t12", "GLM (Poisson/Gamma) — T1+T2 Rate Relativities · Regulatory Filing Layer",
+                         TIER_COLORS["tier1"]),
+                        ("xgb_m", "t3",  "M̂ Ensemble — T3 Interaction Discovery Layer",
+                         TIER_COLORS["tier3"]),
+                    ],
+                ):
+                    with tab_obj:
+                        try:
+                            model = arts_s[model_key]
+                            feats = arts_s[feat_key]
+                            # GLM: use |coef_| as importance proxy; tree models: feature_importances_
+                            if hasattr(model, "coef_"):
+                                fi = np.abs(model.coef_)
+                            else:
+                                fi = model.feature_importances_
+                            fi_df = pd.DataFrame({"Feature": feats, "Importance": fi}
+                                    ).sort_values("Importance", ascending=False).head(15)
+                            fig_fi = go.Figure(go.Bar(
+                                x=fi_df["Importance"], y=fi_df["Feature"],
+                                orientation="h",
+                                marker_color=color,
+                                text=[f"{v:.4f}" for v in fi_df["Importance"]],
+                                textposition="outside",
+                            ))
+                            fig_fi.update_layout(
+                                height=360, **_layout,
+                                title=dict(
+                                    text=label,
+                                    font=dict(color="#6B7280", size=12)
+                                ),
+                                xaxis=dict(title="Importance / |Coefficient|", gridcolor=GRID_COL),
+                                yaxis=dict(showgrid=False, autorange="reversed"),
+                            )
+                            st.plotly_chart(fig_fi, use_container_width=True)
+                        except Exception as ex:
+                            st.info(f"Feature importances not available: {ex}")
 
-            total_prem_from_ix = sum(
-                base_el * (m - 1.0) / PRICING_CFG["target_lr"] * (1 + PRICING_CFG["expense_load"])
-                for _, m, *__ in res_s["interactions"]
-            )
-            st.markdown(f"""<div class='t3-box'>
-            Total premium attributable to Tier 3 interaction effects:
-            <b style='color:#B45309;font-size:1.05rem'>
-              ${total_prem_from_ix:,.0f}/year</b>
-            ({total_prem_from_ix / res_s['premium'] * 100:.0f}% of indicated premium).
-            A Tier 1+2 only model would systematically underprice this policy by exactly this amount.
-            </div>""", unsafe_allow_html=True)
-        else:
-            st.markdown(
-                "<div class='ok-box'>✅ No active Tier 3 interactions on this policy. "
-                "All premium is attributable to Tier 1+2 features.</div>",
-                unsafe_allow_html=True)
+            # ── Interaction decomposition table ────────────────────────────────────
+            st.markdown("---")
+            st.markdown("### ⚡ Tier 3 Interaction Decomposition")
 
-  # ── Sub-tab 2: Business Impact ────────────────────────────────────────────
+            if res_s["interactions"]:
+                ix_rows = []
+                base_el  = res_s["lambda_pred"] * res_s["mu_pred"]
+                for nm, mult, col, *_ in res_s["interactions"]:
+                    contribution_el   = base_el * (mult - 1.0)
+                    contribution_prem = contribution_el / PRICING_CFG["target_lr"]
+                    if PRICING_CFG["expense_load"] > 0:
+                        contribution_prem *= (1 + PRICING_CFG["expense_load"])
+                    ix_rows.append({
+                        "Interaction": nm,
+                        "M̂ Multiplier": f"×{mult:.2f}",
+                        "E[L] Added ($)": f"${contribution_el:,.0f}",
+                        "Premium Added ($)": f"${contribution_prem:,.0f}",
+                        "Business Logic": {
+                            "Wood Shake × High Wildfire":
+                                "Embers ignite degraded shingles at WUI. Camp Fire proof-case.",
+                            "Wood Shake × Mod Wildfire":
+                                "Elevated ignition risk — ember transport over moderate distances.",
+                            "Non-Wood × High Wildfire":
+                                "Even resilient roofs exposed in extreme fire behaviour.",
+                            "High Flood × Coastal <5mi":
+                                "Storm surge amplifies flood losses non-linearly.",
+                            "High Flood Zone":
+                                "Pluvial and fluvial flood risk — pre-code foundations compound.",
+                            "Moderate Flood Zone":
+                                "Surface drainage risk; moderate foundation interaction.",
+                            "High Earthquake Zone":
+                                "Seismic + structural damage from sub-standard build era.",
+                            "Moderate Earthquake Zone":
+                                "Moderate seismic exposure; masonry construction amplifies.",
+                            "Old Roof (>20yr) × Frame":
+                                "Frame shrinkage + aged roofing = water intrusion cycle.",
+                            "Aged Roof > 20 years":
+                                "Granule loss accelerates hail damage penetration.",
+                            "Wood Shake (base fire risk)":
+                                "Ignition temperature 128°C lower than asphalt shingle.",
+                        }.get(nm, "Compound peril co-exposure"),
+                    })
+                ix_df = pd.DataFrame(ix_rows)
+                st.dataframe(ix_df, use_container_width=True, hide_index=True)
+
+                total_prem_from_ix = sum(
+                    base_el * (m - 1.0) / PRICING_CFG["target_lr"] * (1 + PRICING_CFG["expense_load"])
+                    for _, m, *__ in res_s["interactions"]
+                )
+                st.markdown(f"""<div class='t3-box'>
+                Total premium attributable to Tier 3 interaction effects:
+                <b style='color:#B45309;font-size:1.05rem'>
+                  ${total_prem_from_ix:,.0f}/year</b>
+                ({total_prem_from_ix / res_s['premium'] * 100:.0f}% of indicated premium).
+                A Tier 1+2 only model would systematically underprice this policy by exactly this amount.
+                </div>""", unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    "<div class='ok-box'>✅ No active Tier 3 interactions on this policy. "
+                    "All premium is attributable to Tier 1+2 features.</div>",
+                    unsafe_allow_html=True)
+
+      # ── Sub-tab 2: Business Impact ────────────────────────────────────────────
     with _ptabs[1]:
         st.markdown("""
         <div style='padding:6px 0 16px'>
@@ -3678,7 +3677,7 @@ Payback         = ${roi_impl_cost}K / (${annual_loss_saving/1e6:.2f}M / 12)
                 "Mean Severity (μ avg)",
                 "Loss Ratio (portfolio)",
                 "Zero-Claim Proportion",
-                "Tweedie Power Parameter (p)",
+                "GLM Distribution Context (Tweedie p)",
                 "Dispersion Parameter (φ)",
                 "Wood Shake × High WF M̂",
                 "High Flood × Coastal M̂",
@@ -4247,7 +4246,7 @@ with TABS[5]:
     with meth_tab0:
         st.markdown("## The GLM: Why It's the Right Foundation — and Where It Falls Short")
         st.markdown("""<div class='info-box'>
-        The Generalized Linear Model with Tweedie distribution is the <b>actuarial gold standard</b>
+        The Generalized Linear Model is the <b>actuarial gold standard</b>
         for homeowners risk scoring. It is what state DOIs accept in rate filings. It is what
         the CAS Monograph No. 5 (2nd Ed, 2025) endorses. It is what 95% of carriers already use.
         This demo does not replace it — it makes it smarter.
@@ -4263,7 +4262,7 @@ with TABS[5]:
               <ul style='color:#374151;font-size:.83rem;line-height:1.8;margin:0;padding-left:18px'>
                 <li><b>Regulatory acceptance:</b> State DOIs have established review procedures specifically for GLMs. Every exp(β) is a named rate relativity that can be filed and defended.</li>
                 <li><b>Full transparency:</b> The linear predictor is exact — no black box. A coefficient of 0.30 means that feature multiplies expected loss by exp(0.30) = 1.35×. A Chief Actuary can read and sign off on every factor.</li>
-                <li><b>Tweedie advantage:</b> With power parameter p=1.65, the Tweedie handles the exact structure of homeowners data — 94% zero-claim policies plus continuous positive losses — in a single model. No frequency/severity split required.</li>
+                <li><b>Poisson × Gamma decomposition:</b> Separate frequency (Poisson GLM) and severity (Gamma GLM) models meet Munich Re/Swiss Re treaty standards requiring independent frequency and severity trends. Each produces its own exp(β) relativity table for regulatory filing.</li>
                 <li><b>CAS Monograph canonical:</b> The profession's reference text covers this methodology explicitly. Carriers can cite it in regulatory memoranda.</li>
                 <li><b>NAIC AI Bulletin compliant:</b> GLM coefficients satisfy the explainability mandate natively. No post-hoc SHAP approximation needed.</li>
               </ul>
@@ -4383,24 +4382,37 @@ with TABS[5]:
         st.markdown("---")
         st.markdown("### GLM Rate Relativities — The Transparent Actuarial Foundation")
         st.markdown("""<div class='info-box'>
-        Every coefficient below is exp(β) from the fitted Tweedie GLM — directly usable as
-        a rate relativity factor in a DOI rate filing. This is the foundation that M̂ builds on top of.
+        Every coefficient below is exp(β) from the fitted Poisson (frequency) and Gamma (severity) GLMs —
+        directly usable as rate relativity factors in a DOI rate filing. These are the actual models in the pricing chain.
         </div>""", unsafe_allow_html=True)
 
-        glm_rel = arts.get("glm_relativities", {})
-        if glm_rel:
-            rel_rows = []
-            for feat, rel in sorted(glm_rel.items(), key=lambda x: abs(x[1]-1.0), reverse=True):
+        from predictor import get_glm_relativities as _get_rels
+        _rels = _get_rels()
+
+        def _show_rel_table(rel_dict, label, color):
+            if not rel_dict:
+                st.info(f"{label} relativities not available.")
+                return
+            rows = []
+            for feat, rel in sorted(rel_dict.items(), key=lambda x: abs(x[1]-1.0), reverse=True):
                 direction = "↑ Risk factor" if rel > 1.0 else "↓ Mitigant"
-                impact    = f"+{(rel-1)*100:.1f}%" if rel > 1.0 else f"{(rel-1)*100:.1f}%"
-                color     = "#c0403a" if rel > 1.05 else "#059669" if rel < 0.95 else "#CA8A04"
-                rel_rows.append({"Feature": feat, "Relativity exp(β)": f"{rel:.4f}",
-                                  "Premium Impact": impact, "Direction": direction})
-            if rel_rows:
-                rel_df = pd.DataFrame(rel_rows)
-                st.dataframe(rel_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("GLM relativities loaded from fitted model artifacts.")
+                impact = f"+{(rel-1)*100:.1f}%" if rel > 1.0 else f"{(rel-1)*100:.1f}%"
+                rows.append({"Feature": feat, "exp(β)": f"{rel:.4f}",
+                              "Impact": impact, "Direction": direction})
+            if rows:
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+        _rc1, _rc2 = st.columns(2)
+        with _rc1:
+            st.markdown(f"<div style='font-size:.82rem;font-weight:700;color:#1D4ED8;"
+                        f"margin-bottom:6px'>λ Frequency Relativities (Poisson GLM)</div>",
+                        unsafe_allow_html=True)
+            _show_rel_table(_rels.get("poisson", {}), "Poisson", "#1D4ED8")
+        with _rc2:
+            st.markdown(f"<div style='font-size:.82rem;font-weight:700;color:#6D28D9;"
+                        f"margin-bottom:6px'>μ Severity Relativities (Gamma GLM)</div>",
+                        unsafe_allow_html=True)
+            _show_rel_table(_rels.get("gamma", {}), "Gamma", "#6D28D9")
 
         st.markdown("---")
         st.markdown("### GLM + M̂ vs GLM Alone — The Value Proposition in Numbers")
@@ -4484,7 +4496,6 @@ with TABS[5]:
               Regulatory Baseline — Primary Model</div>
             <div style='color:#6B7280;font-size:.8rem;line-height:1.6'>
               PoissonRegressor (λ) × GammaRegressor (μ) — pricing baseline<br>
-              TweedieRegressor (p=1.65) — rate-filing display artifact<br>
               24 T1+T2 features → exp(β) rate relativities<br>
               DOI rate-filing ready · NAIC AI Bulletin compliant<br>
               <b style='color:#1D4ED8'>This is the model carriers already trust.</b>
@@ -4525,7 +4536,7 @@ with TABS[5]:
               🏛️ Filed with DOI — Publicly Auditable
             </div>
             <div style='font-size:1rem;font-weight:800;color:#0F172A;margin-bottom:8px'>
-              Tweedie GLM Rate Plan
+              GLM Rate Relativities (Poisson + Gamma)
             </div>
             <div style='color:#374151;font-size:.82rem;line-height:1.7;margin-bottom:12px'>
               The GLM coefficients <em>are</em> the rate filing. Every exp(β) is a named,
@@ -4666,7 +4677,7 @@ with TABS[5]:
              "For wildfire/hurricane exposure this is the difference between reserving $80K "
              "vs. $200K on the same policy type — a material reserving error."),
             ("Combined\nPipeline",
-             "Tweedie GLM (single log-link, p∈(1,2))<br><span style='color:#9CA3AF;font-size:.75rem'>"
+             "Poisson × Gamma GLM (decomposed freq × sev)<br><span style='color:#9CA3AF;font-size:.75rem'>"
              "Elegant · DOI gold standard · Rate-filing ready</span>",
              "E[L] = GLM_Poisson(λ) × GLM_Gamma(μ) × M̂(T3)<br><span style='color:#9CA3AF;font-size:.75rem'>"
              "GLM handles T1+T2 additive signal<br>M̂ captures CAT co-exposures</span>",
@@ -5019,7 +5030,7 @@ with TABS[5]:
             st.markdown(f"""<div style='background:linear-gradient(135deg,#F0FDF4,#0e1a10);
               border:1.5px solid #2e7a50;border-radius:14px;padding:20px;height:100%'>
               <div style='font-size:.72rem;color:#2e7a50;text-transform:uppercase;
-                letter-spacing:1px;margin-bottom:8px'>✅ Chosen: Tweedie GLM</div>
+                letter-spacing:1px;margin-bottom:8px'>✅ Chosen: Poisson × Gamma GLM</div>
               <div style='color:#7ac49a;font-size:.9rem;font-weight:600;margin-bottom:10px'>
                 Regulatory-grade explainability</div>
               <ul style='color:#6B7280;font-size:.8rem;padding-left:16px;line-height:1.8;margin:0'>
@@ -5053,8 +5064,8 @@ with TABS[5]:
 
         st.markdown("---")
 
-        # Tweedie distribution
-        st.markdown("### Tweedie Distribution — Why It Fits Homeowners Loss Data")
+        # Tweedie as theoretical background
+        st.markdown("### Tweedie Distribution — Theoretical Foundation for Homeowners Loss Data")
         st.markdown(f"""<div class='formula-t3'>
 <b>Tweedie Compound Poisson-Gamma</b><br><br>
 
@@ -5069,7 +5080,7 @@ with TABS[5]:
   Homeowners calibration:  p = 1.65,   φ = 2.50<br><br>
 
   <b>Why this matters:</b> Standard Gamma assumes all policies claim (p=2).
-  Standard Poisson assumes mean=variance (p=1). Tweedie with p=1.65 is the
+  Standard Poisson assumes mean=variance (p=1). The Tweedie with p=1.65 is the
   only single-model approach that handles 95% zeros + continuous positive claims
   without two-part model inconsistencies.
 </div>""", unsafe_allow_html=True)
